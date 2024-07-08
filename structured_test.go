@@ -1,59 +1,126 @@
+//go:build structuredlogs
+// +build structuredlogs
+
 package logs_test
 
 import (
 	"context"
+	"log"
+	"net/http/httptest"
+	"time"
 
 	"github.com/rclark/logs"
 )
 
-// entry is the structure for each log entry you wish to capture.
-type entry struct {
-	Name     string
-	Count    int
-	Flag     bool
-	Messages []string
-}
+func Example() {
+	ctx := logs.
+		NewLogger(logs.NewExampleLog).
+		Set(context.Background())
 
-// newEntry defines how to create an empty, mutable version of a log entry.
-func newEntry() *entry {
-	return &entry{}
-}
+	ctx = logs.AddEntry[logs.ExampleLog](ctx)
 
-func Example_structured() {
-	// Set the logging mode to structured.
-	logs.StructuredMode(newEntry)
-
-	ctx := logs.AddEntry(context.Background())
-
-	logs.Adjust(ctx, func(e *entry) {
+	logs.Adjust(ctx, func(e *logs.ExampleLog) {
 		e.Name = "test"
 		e.Count = 42
 		e.Flag = true
 		e.Messages = []string{"hello", "world"}
 	})
 
-	logs.Print(ctx, logs.WithCurrentTime(fakeTimer{}))
-	// Output: {"@level":"INFO","@time":"0001-01-01T00:00:00Z","Name":"test","Count":42,"Flag":true,"Messages":["hello","world"]}
+	logs.Print[logs.ExampleLog](ctx, logs.WithCurrentTime(time.Time{}))
+	// Output: {"@level":"INFO","@time":"0001-01-01T00:00:00Z","name":"test","count":42,"flag":true,"messages":["hello","world"]}
 }
 
-func Example_structuredLogger() {
-	logger := logs.NewLogger(newEntry)
+func ExampleAdjust() {
+	ctx := logs.
+		NewLogger(logs.NewExampleLog).
+		Set(context.Background())
 
-	ctx := logger.AddEntry(context.Background())
+	ctx = logs.AddEntry[logs.ExampleLog](ctx)
 
-	// You can adjust with the logger.
-	logger.Adjust(ctx, func(e *entry) {
+	logs.Adjust(ctx, func(e *logs.ExampleLog) {
 		e.Name = "test"
 		e.Count = 42
 		e.Flag = true
 		e.Messages = []string{"hello", "world"}
 	})
 
-	// You can still adjust without having to use the logger.
-	logs.Adjust(ctx, func(e *entry) {
-		e.Flag = false
+	logs.Print[logs.ExampleLog](ctx, logs.WithCurrentTime(time.Time{}))
+	// Output: {"@level":"INFO","@time":"0001-01-01T00:00:00Z","name":"test","count":42,"flag":true,"messages":["hello","world"]}
+}
+
+func ExampleGetEntry() {
+	ctx := logs.
+		NewLogger(logs.NewExampleLog).
+		Set(context.Background())
+
+	ctx = logs.AddEntry[logs.ExampleLog](ctx)
+
+	logs.Adjust(ctx, func(e *logs.ExampleLog) {
+		e.Name = "test"
+		e.Count = 42
+		e.Flag = true
+		e.Messages = []string{"hello", "world"}
 	})
 
-	logger.Print(ctx, logs.WithCurrentTime(fakeTimer{}))
-	// Output: {"@level":"INFO","@time":"0001-01-01T00:00:00Z","Name":"test","Count":42,"Flag":false,"Messages":["hello","world"]}
+	e := logs.GetEntry[logs.ExampleLog](ctx)
+	if e == nil {
+		log.Fatal("entry not found")
+	}
+
+	e.Flag = false
+
+	logs.Print[logs.ExampleLog](ctx, logs.WithCurrentTime(time.Time{}))
+	// Output: {"@level":"INFO","@time":"0001-01-01T00:00:00Z","name":"test","count":42,"flag":false,"messages":["hello","world"]}
+}
+
+func Example_logLevels() {
+	// Will only print logs at or above INFO level.
+	printOptions := []logs.PrintOption{
+		logs.WithCurrentTime(time.Time{}),
+		logs.WithLevel(logs.INFO),
+	}
+
+	newCtx := func() context.Context {
+		return logs.
+			NewLogger(logs.NewExampleLog).
+			Set(context.Background())
+	}
+
+	ctx := logs.AddEntry[logs.ExampleLog](newCtx(), logs.WithDefaultLevel(logs.DEBUG))
+	logs.Adjust(ctx, func(e *logs.ExampleLog) {
+		e.Messages = []string{"debug"}
+	})
+	logs.Print[logs.ExampleLog](ctx, printOptions...)
+
+	ctx = logs.AddEntry[logs.ExampleLog](newCtx(), logs.WithDefaultLevel(logs.DEBUG))
+	logs.Info[logs.ExampleLog](ctx)
+	logs.Adjust(ctx, func(e *logs.ExampleLog) {
+		e.Messages = []string{"info"}
+	})
+	logs.Print[logs.ExampleLog](ctx, printOptions...)
+
+	ctx = logs.AddEntry[logs.ExampleLog](newCtx(), logs.WithDefaultLevel(logs.DEBUG))
+	logs.Warn[logs.ExampleLog](ctx)
+	logs.Print[logs.ExampleLog](ctx, printOptions...)
+
+	ctx = logs.AddEntry[logs.ExampleLog](newCtx(), logs.WithDefaultLevel(logs.DEBUG))
+	logs.Error[logs.ExampleLog](ctx)
+	logs.Adjust(ctx, func(e *logs.ExampleLog) {
+		e.Messages = []string{"error"}
+	})
+	logs.Print[logs.ExampleLog](ctx, printOptions...)
+	// Output:
+	// {"@level":"INFO","@time":"0001-01-01T00:00:00Z","name":"","count":0,"flag":false,"messages":["info"]}
+	// {"@level":"WARN","@time":"0001-01-01T00:00:00Z","name":"","count":0,"flag":false}
+	// {"@level":"ERROR","@time":"0001-01-01T00:00:00Z","name":"","count":0,"flag":false,"messages":["error"]}
+}
+
+func ExampleMiddleware() {
+	middleware := logs.Middleware(logs.NewExampleLog, logs.WithTiming(time.Time{}, time.Duration(1234)))
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest("GET", "/path", nil)
+
+	middleware(loggerHandler).ServeHTTP(w, r)
+	// Output: {"@level":"INFO","@time":"0001-01-01T00:00:00Z","name":"test","count":42,"flag":true,"messages":["hello","world"]}
 }

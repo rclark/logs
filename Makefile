@@ -1,4 +1,9 @@
-.PHONY: init doc test
+GOMARKDOC := gomarkdoc
+
+# hacked gomarkdoc to resolve https://github.com/princjef/gomarkdoc/issues/113
+# GOMARKDOC := /Users/ryanclark/rclark/gomarkdoc/cmd/gomarkdoc/gomarkdoc_hack
+
+.PHONY: init doc test-standard test-structured test
 
 init:
 	go mod tidy
@@ -13,12 +18,22 @@ init:
 	fi
 
 doc:
-	@gomarkdoc \
-		--output readme.md  \
-		--template-file file=templates/file.md \
+	@$(GOMARKDOC) \
+		--output standard.md  \
+		.
+
+	@$(GOMARKDOC) \
+	  --tags structuredlogs \
+		--output structured.md  \
 		--template-file package=templates/package.md \
 		.
 
-test:
-	gotestsum --format testname -- -coverprofile=coverage.out ./...
-	gocov convert coverage.out | gocov-html > coverage.html
+test-standard:
+	@gotestsum --format testname -- -coverprofile=coverage.out ./...
+	@gocov convert coverage.out | gocov-html > coverage-standard.html
+
+test-structured:
+	@gotestsum --format testname -- -tags=structuredlogs -coverprofile=coverage.out ./...
+	@gocov convert coverage.out | gocov-html > coverage-structured.html
+
+test: test-standard test-structured

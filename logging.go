@@ -1,38 +1,3 @@
-/*
-Package logs supports structured, context-based logging.
-
-When you import the package, it will start in [FreeformMode]. This means that
-you'll be working to generate logs that are represented internally as
-[FreeformEntry]s. In [FreeformMode]:
-
-  - [Add] allows you to add arbitrary, nested, key-value pairs to the log entry.
-  - [Append] allows to you append items to a slice that's located at some nested
-    key within the log entry.
-  - [GetFreeformEntry] allows you to get the log entry and manipulate it directly.
-
-You can switch the package into [StructuredMode]. In this mode, you must design
-your own struct that represents your desired log entry, and provide a
-function for creating a mutable representation of that struct (i.e. a
-pointer). In [StructuredMode]:
-
-  - [Adjust] allows you to provide functions that mutate the underlying log entry.
-  - [GetEntry] allows you to get a pointer to the log entry and manipulate it
-    directly.
-
-In either mode, you will use a number of functions which are exported as
-variables. These variables will change their behavior depending on the mode,
-to accommodate the different types of log entries. These variables include:
-
-  - [AddEntry] to place a new, empty log entry in some context.
-  - [Print] to write the log entry found in a context, as JSON, to
-    os.Stdout (or your io.Writer of choice).
-  - [Debug], [Info], etc. functions to set the log level.
-
-Output logs in [FreeformMode] will always include "@level" and "@time"
-properties to describe the log's level and the time that [Print] was called. In
-[StructuredMode] these properties will be added as long as your provided type
-marshals to JSON as an object.
-*/
 package logs
 
 import (
@@ -44,66 +9,6 @@ import (
 	"os"
 	"time"
 )
-
-type mode int
-
-const (
-	// Freeform is the default logging mode. It allows you to log key-value pairs
-	// using the [Add] and [Append] functions. You can manipulate the
-	// [FreeformEntry] (which is a map[string]any) using the [AdjustFreeform]
-	// function, or retrieve it using the [GetFreeformEntry] function.
-	Freeform mode = iota
-
-	// Structured is a logging mode that allows you to log data structured
-	// according to a specific type of your design. You can manipulate the log
-	// entry using the [Adjust] function or retrieve it using the [GetEntry]
-	// function.
-	Structured
-)
-
-var m mode
-
-// CurrentMode returns the current logging mode.
-func CurrentMode() mode {
-	return m
-}
-
-// StructuredMode sets the logging mode to structured for a specific type of
-// log entry.
-//
-// This mode allows you to log data structured according to a specific type of
-// your design. You can manipulate the log entry using the [Adjust] function
-// or retrieve it using the [GetEntry] function.
-func StructuredMode[T any](create EntryMaker[T]) {
-	m = Structured
-	logger := NewLogger(create)
-	AddEntry = logger.AddEntry
-	Print = logger.Print
-	Debug = logger.Debug
-	Info = logger.Info
-	Warn = logger.Warn
-	Error = logger.Error
-	Fatal = logger.Fatal
-	Middleware = logger.Middleware
-}
-
-// FreeformMode sets the logging mode to free-form.
-//
-// This is the default logging mode. It allows you to log key-value pairs
-// using the [Add] and [Append] functions. You can manipulate the
-// [FreeformEntry] (which is a map[string]any) using the [AdjustFreeform]
-// function, or retrieve it using the [GetFreeformEntry] function.
-func FreeformMode() {
-	m = Freeform
-	AddEntry = addFreeformEntry
-	Print = print[FreeformEntry]
-	Debug = debug[FreeformEntry]
-	Info = info[FreeformEntry]
-	Warn = warn[FreeformEntry]
-	Error = err[FreeformEntry]
-	Fatal = fatal[FreeformEntry]
-	Middleware = freeformMiddleware
-}
 
 // EntryMaker is any function that creates a new, mutable log entry.
 type EntryMaker[T any] func() *T
@@ -149,6 +54,9 @@ type option struct {
 	body        bool
 	allHeaders  bool
 	someHeaders []string
+	now         time.Time
+	since       time.Duration
+	fakeTime    bool
 }
 
 // PrintOption is a configuration option for printing logs.
@@ -188,10 +96,24 @@ func (defaultTimer) Since(t time.Time) time.Duration {
 	return time.Since(t)
 }
 
-// WithCurrentTime configures a custom timer for measuring the current time.
-func WithCurrentTime(t Timer) PrintOption {
+type fakeTimer struct {
+	now   time.Time
+	since time.Duration
+}
+
+func (t fakeTimer) Now() time.Time {
+	return t.now
+}
+
+func (t fakeTimer) Since(time.Time) time.Duration {
+	return t.since
+}
+
+// WithCurrentTime configures logs to always print with the same timestamp.
+func WithCurrentTime(now time.Time) PrintOption {
 	return func(o *option) {
-		o.timer = t
+		o.now = now
+		o.fakeTime = true
 	}
 }
 
@@ -220,63 +142,58 @@ func applyOptions[T ~func(*option)](opts ...T) option {
 		opt(&o)
 	}
 
+	if o.fakeTime {
+		o.timer = fakeTimer{
+			now:   o.now,
+			since: o.since,
+		}
+	}
+
 	return o
 }
 
-type ctxKey struct{}
+type entryKey struct{}
 
-var entryKey = ctxKey{}
+var eKey = entryKey{}
 
 type entry[T any] struct {
 	level Level
 	data  *T
 }
 
-// AddEntry adds a log entry to the context. This variable's value changes when
-// you change the package to [StructuredMode].
-var AddEntry func(ctx context.Context, opts ...Option) context.Context = addFreeformEntry
-
 func addEntry[T any](ctx context.Context, create EntryMaker[T], opts ...Option) context.Context {
 	log := entry[T]{data: create()}
 	options := applyOptions(opts...)
 	log.level = options.entryLevel
-	return context.WithValue(ctx, entryKey, &log)
+	return context.WithValue(ctx, eKey, &log)
 }
 
-func addFreeformEntry(ctx context.Context, opts ...Option) context.Context {
-	return addEntry(ctx, newFreeformEntry, opts...)
-}
-
-func find[T any](ctx context.Context) *entry[T] {
-	if entry, ok := ctx.Value(entryKey).(*entry[T]); ok {
+func getEntry[T any](ctx context.Context) *entry[T] {
+	if entry, ok := ctx.Value(eKey).(*entry[T]); ok {
 		return entry
 	}
 
 	return nil
 }
 
-// Print prints the log entry in the context as JSON. The function will return
-// false if no log entry is found. This variable's value changes when you
-// change the package to [StructuredMode].
-//
-// The default output is os.Stdout. You can change this by providing a custom
-// io.Writer using the [WithOutput] option.
-//
-// The default log level for printing is INFO. You can change this by providing
-// a custom log level using the [WithLevel] option.
-//
-// The default timer is the system clock. You can change this by providing a
-// custom timer using the [WithCurrentTime] option. This is useful if you need
-// to write tests to confirm that your application is logging as expected, as
-// your custom timer can be used to control the log entry's "@time" property.
-//
-// If the you've provided a custom struct for your log entries and it fails to
-// marshal to JSON using the standard json.Marshal(), the function will write an
-// error message to os.Stderr and return false.
-var Print func(ctx context.Context, opts ...PrintOption) bool = print[FreeformEntry]
+// adjuster is a function that adjust a log entry.
+type adjuster[T any] func(*T)
+
+// adjust mutates the log entry in the context. The function will return false
+// if no log entry of the correct type is found in the context.
+func adjust[T any](ctx context.Context, fns ...adjuster[T]) bool {
+	if entry := getEntry[T](ctx); entry != nil {
+		for _, fn := range fns {
+			fn(entry.data)
+		}
+		return true
+	}
+
+	return false
+}
 
 func print[T any](ctx context.Context, opts ...PrintOption) bool {
-	if entry := find[T](ctx); entry != nil {
+	if entry := getEntry[T](ctx); entry != nil {
 		options := applyOptions(opts...)
 
 		if entry.level < options.printLevel {
@@ -297,6 +214,7 @@ func print[T any](ctx context.Context, opts ...PrintOption) bool {
 			now := options.timer.Now().Format(time.RFC3339)
 			meta := []byte(fmt.Sprintf(tpl, entry.level, now))
 			data = append(meta, data[1:]...)
+			data = append(data, '\n')
 		}
 
 		if _, err := options.out.Write(data); err != nil {
@@ -310,13 +228,8 @@ func print[T any](ctx context.Context, opts ...PrintOption) bool {
 	return false
 }
 
-// Debug sets the log entry's level to DEBUG. The function will return false if
-// no log entry is found in the context. This variable's value changes when you
-// change the package to [StructuredMode].
-var Debug func(ctx context.Context) bool = debug[FreeformEntry]
-
 func debug[T any](ctx context.Context) bool {
-	if entry := find[T](ctx); entry != nil {
+	if entry := getEntry[T](ctx); entry != nil {
 		entry.level = DEBUG
 		return true
 	}
@@ -324,13 +237,8 @@ func debug[T any](ctx context.Context) bool {
 	return false
 }
 
-// Info sets the log entry's level to INFO. The function will return false if no
-// log entry is found in the context. This variable's value changes when you
-// change the package to [StructuredMode].
-var Info func(ctx context.Context) bool = info[FreeformEntry]
-
 func info[T any](ctx context.Context) bool {
-	if entry := find[T](ctx); entry != nil {
+	if entry := getEntry[T](ctx); entry != nil {
 		entry.level = INFO
 		return true
 	}
@@ -338,13 +246,8 @@ func info[T any](ctx context.Context) bool {
 	return false
 }
 
-// Warn sets the log entry's level to WARN. The function will return false if no
-// log entry is found in the context. This variable's value changes when you
-// change the package to [StructuredMode].
-var Warn func(ctx context.Context) bool = warn[FreeformEntry]
-
 func warn[T any](ctx context.Context) bool {
-	if entry := find[T](ctx); entry != nil {
+	if entry := getEntry[T](ctx); entry != nil {
 		entry.level = WARN
 		return true
 	}
@@ -352,13 +255,8 @@ func warn[T any](ctx context.Context) bool {
 	return false
 }
 
-// Error sets the log entry's level to ERROR. The function will return false if
-// no log entry is found in the context. This variable's value changes when you
-// change the package to [StructuredMode].
-var Error func(ctx context.Context) bool = err[FreeformEntry]
-
 func err[T any](ctx context.Context) bool {
-	if entry := find[T](ctx); entry != nil {
+	if entry := getEntry[T](ctx); entry != nil {
 		entry.level = ERROR
 		return true
 	}
@@ -366,16 +264,41 @@ func err[T any](ctx context.Context) bool {
 	return false
 }
 
-// Fatal sets the log entry's level to FATAL. The function will return false if
-// no log entry is found in the context. This variable's value changes when you
-// change the package to [StructuredMode].
-var Fatal func(ctx context.Context) bool = fatal[FreeformEntry]
-
 func fatal[T any](ctx context.Context) bool {
-	if entry := find[T](ctx); entry != nil {
+	if entry := getEntry[T](ctx); entry != nil {
 		entry.level = FATAL
 		return true
 	}
 
 	return false
+}
+
+// MiddlewareOption is used to configure logs generated by the [Middleware].
+type MiddlewareOption func(*option)
+
+// DefaultLevel sets the default log level for the log entries produced by the
+// [Middleware].
+func DefaultLevel(level Level) MiddlewareOption {
+	return MiddlewareOption(WithDefaultLevel(level))
+}
+
+// PrintLevel sets the minimum log level for printing log entries produced by
+// the [Middleware].
+func PrintLevel(level Level) MiddlewareOption {
+	return MiddlewareOption(WithLevel(level))
+}
+
+// WithOutput sets the output for the log entries produced by the [Middleware].
+func Output(out io.Writer) MiddlewareOption {
+	return MiddlewareOption(WithOutput(out))
+}
+
+// WithTiming configures the middleware to always print logs with the given
+// timestamp and the given duration.
+func WithTiming(now time.Time, since time.Duration) MiddlewareOption {
+	return func(o *option) {
+		o.now = now
+		o.since = since
+		o.fakeTime = true
+	}
 }

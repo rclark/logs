@@ -1,6 +1,20 @@
-## Usage
+{{- if eq .Name "main" -}}
+	{{- header .Level .Dirname -}}
+{{- else -}}
+	{{- header .Level .Name -}}
+{{- end -}}
 {{- spacer -}}
+
 {{- template "import" . -}}
+{{- spacer -}}
+
+**Note**: This file documents the use of this package when built with a explicit build tag to put it into "structured mode"
+
+```
+go build -tags=structuredlogs
+```
+
+[Documentation for the build without this tag is available here](./standard.md).
 {{- spacer -}}
 
 {{- if len .Doc.Blocks -}}
