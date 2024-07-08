@@ -994,7 +994,7 @@ import (
 	"github.com/rclark/logs"
 )
 
-var loggerHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+var handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	logger := logs.Get[logs.ExampleLog](r.Context())
 	if logger == nil {
 		log.Fatal("logger not found")
@@ -1016,7 +1016,7 @@ func main() {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/path", nil)
 
-	middleware(loggerHandler).ServeHTTP(w, r)
+	middleware(handler).ServeHTTP(w, r)
 }
 ```
 

@@ -6,6 +6,7 @@ package logs_test
 import (
 	"context"
 	"log"
+	"net/http"
 	"net/http/httptest"
 	"time"
 
@@ -115,12 +116,26 @@ func Example_logLevels() {
 	// {"@level":"ERROR","@time":"0001-01-01T00:00:00Z","name":"","count":0,"flag":false,"messages":["error"]}
 }
 
+var structuredHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	logger := logs.Get[logs.ExampleLog](r.Context())
+	if logger == nil {
+		log.Fatal("logger not found")
+	}
+
+	logger.Adjust(r.Context(), func(e *logs.ExampleLog) {
+		e.Name = "test"
+		e.Count = 42
+		e.Flag = true
+		e.Messages = []string{"hello", "world"}
+	})
+})
+
 func ExampleMiddleware() {
 	middleware := logs.Middleware(logs.NewExampleLog, logs.WithTiming(time.Time{}, time.Duration(1234)))
 
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/path", nil)
 
-	middleware(loggerHandler).ServeHTTP(w, r)
+	middleware(structuredHandler).ServeHTTP(w, r)
 	// Output: {"@level":"INFO","@time":"0001-01-01T00:00:00Z","name":"test","count":42,"flag":true,"messages":["hello","world"]}
 }

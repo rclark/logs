@@ -77,7 +77,7 @@ func ExampleLogger_logLevels() {
 	// {"@level":"FATAL","@time":"0001-01-01T00:00:00Z","name":"","count":0,"flag":false}
 }
 
-var loggerHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+var handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	logger := logs.Get[logs.ExampleLog](r.Context())
 	if logger == nil {
 		log.Fatal("logger not found")
@@ -99,6 +99,6 @@ func ExampleLogger_Middleware() {
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/path", nil)
 
-	middleware(loggerHandler).ServeHTTP(w, r)
+	middleware(handler).ServeHTTP(w, r)
 	// Output: {"@level":"INFO","@time":"0001-01-01T00:00:00Z","name":"test","count":42,"flag":true,"messages":["hello","world"]}
 }
