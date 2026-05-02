@@ -3,7 +3,7 @@
 # logs
 
 ```go
-import "github.com/rclark/logs"
+import "github.com/rclark/logs/v2"
 ```
 
 Package logs offers structured, context\-based logging via two methods. The freeform method lets you create log entries by adding key\-value pairs to a [FreeformEntry](<#FreeformEntry>), which represents a log entry as a map with string keys and any values.
@@ -18,27 +18,17 @@ Alternatively, build your application with the "structuredlogs" tag. This expose
 
 
 ```go
-package main
+ctx := logs.AddEntry(context.Background())
 
-import (
-	"context"
-	"time"
-
-	"github.com/rclark/logs"
+logs.Add(ctx,
+	"name", "test",
+	"count", 42,
+	"flag", true,
+	"messages", []string{"hello", "world"},
 )
 
-func main() {
-	ctx := logs.AddEntry(context.Background())
-
-	logs.Add(ctx,
-		"name", "test",
-		"count", 42,
-		"flag", true,
-		"messages", []string{"hello", "world"},
-	)
-
-	logs.Print(ctx, logs.WithCurrentTime(time.Time{}))
-}
+logs.Print(ctx, logs.WithCurrentTime(time.Time{}))
+// Output: {"@level":"INFO","@time":"0001-01-01T00:00:00Z","count":42,"flag":true,"messages":["hello","world"],"name":"test"}
 ```
 
 #### Output
@@ -56,40 +46,33 @@ func main() {
 
 
 ```go
-package main
-
-import (
-	"context"
-	"time"
-
-	"github.com/rclark/logs"
-)
-
-func main() {
-	// Will only print logs at or above INFO level.
-	printOptions := []logs.PrintOption{
-		logs.WithCurrentTime(time.Time{}),
-		logs.WithLevel(logs.INFO),
-	}
-
-	ctx := logs.AddEntry(context.Background(), logs.WithDefaultLevel(logs.DEBUG))
-	logs.Add(ctx, "this one", "is debug")
-	logs.Print(ctx, printOptions...)
-
-	ctx = logs.AddEntry(context.Background(), logs.WithDefaultLevel(logs.DEBUG))
-	logs.Info(ctx)
-	logs.Add(ctx, "this one", "is info")
-	logs.Print(ctx, printOptions...)
-
-	ctx = logs.AddEntry(context.Background(), logs.WithDefaultLevel(logs.DEBUG))
-	logs.Warn(ctx)
-	logs.Print(ctx, printOptions...)
-
-	ctx = logs.AddEntry(context.Background(), logs.WithDefaultLevel(logs.DEBUG))
-	logs.Error(ctx)
-	logs.Add(ctx, "this one", "is error")
-	logs.Print(ctx, printOptions...)
+// Will only print logs at or above INFO level.
+printOptions := []logs.PrintOption{
+	logs.WithCurrentTime(time.Time{}),
+	logs.WithLevel(logs.INFO),
 }
+
+ctx := logs.AddEntry(context.Background(), logs.WithDefaultLevel(logs.DEBUG))
+logs.Add(ctx, "this one", "is debug")
+logs.Print(ctx, printOptions...)
+
+ctx = logs.AddEntry(context.Background(), logs.WithDefaultLevel(logs.DEBUG))
+logs.Info(ctx)
+logs.Add(ctx, "this one", "is info")
+logs.Print(ctx, printOptions...)
+
+ctx = logs.AddEntry(context.Background(), logs.WithDefaultLevel(logs.DEBUG))
+logs.Warn(ctx)
+logs.Print(ctx, printOptions...)
+
+ctx = logs.AddEntry(context.Background(), logs.WithDefaultLevel(logs.DEBUG))
+logs.Error(ctx)
+logs.Add(ctx, "this one", "is error")
+logs.Print(ctx, printOptions...)
+// Output:
+// {"@level":"INFO","@time":"0001-01-01T00:00:00Z","this one":"is info"}
+// {"@level":"WARN","@time":"0001-01-01T00:00:00Z"}
+// {"@level":"ERROR","@time":"0001-01-01T00:00:00Z","this one":"is error"}
 ```
 
 #### Output
@@ -143,8 +126,10 @@ func main() {
   - [func Output\(out io.Writer\) MiddlewareOption](<#Output>)
   - [func PrintLevel\(level Level\) MiddlewareOption](<#PrintLevel>)
   - [func WithAllHeaders\(\) MiddlewareOption](<#WithAllHeaders>)
+  - [func WithAllResponseHeaders\(\) MiddlewareOption](<#WithAllResponseHeaders>)
   - [func WithBody\(\) MiddlewareOption](<#WithBody>)
   - [func WithHeaders\(headers ...string\) MiddlewareOption](<#WithHeaders>)
+  - [func WithResponseHeaders\(headers ...string\) MiddlewareOption](<#WithResponseHeaders>)
   - [func WithTiming\(now time.Time, since time.Duration\) MiddlewareOption](<#WithTiming>)
 - [type Option](<#Option>)
   - [func WithDefaultLevel\(level Level\) Option](<#WithDefaultLevel>)
@@ -156,7 +141,7 @@ func main() {
 
 
 <a name="Add"></a>
-## func Add
+## func [Add](<https://github.com/rclark/logs/blob/main/free-form.go#L166>)
 
 ```go
 func Add(ctx context.Context, args ...any) bool
@@ -170,26 +155,16 @@ Add adds key\-value pairs to a freeform log entry. The function will return fals
 
 
 ```go
-package main
+ctx := logs.AddEntry(context.Background())
 
-import (
-	"context"
-	"time"
-
-	"github.com/rclark/logs"
+logs.Add(ctx,
+	"user.name", "test",
+	"user.count", 42,
+	"user.flags.flag", true,
 )
 
-func main() {
-	ctx := logs.AddEntry(context.Background())
-
-	logs.Add(ctx,
-		"user.name", "test",
-		"user.count", 42,
-		"user.flags.flag", true,
-	)
-
-	logs.Print(ctx, logs.WithCurrentTime(time.Time{}))
-}
+logs.Print(ctx, logs.WithCurrentTime(time.Time{}))
+// Output: {"@level":"INFO","@time":"0001-01-01T00:00:00Z","user":{"count":42,"flags":{"flag":true},"name":"test"}}
 ```
 
 #### Output
@@ -202,7 +177,7 @@ func main() {
 </details>
 
 <a name="AddEntry"></a>
-## func AddEntry
+## func [AddEntry](<https://github.com/rclark/logs/blob/main/free-form.go#L37>)
 
 ```go
 func AddEntry(ctx context.Context, opts ...Option) context.Context
@@ -211,7 +186,7 @@ func AddEntry(ctx context.Context, opts ...Option) context.Context
 AddEntry adds a log entry to the context.
 
 <a name="Adjust"></a>
-## func Adjust
+## func [Adjust](<https://github.com/rclark/logs/blob/main/free-form.go#L153>)
 
 ```go
 func Adjust(ctx context.Context, fns ...func(*FreeformEntry)) bool
@@ -225,28 +200,18 @@ Adjust mutates the log entry in the context. The function will return false if n
 
 
 ```go
-package main
+ctx := logs.AddEntry(context.Background())
 
-import (
-	"context"
-	"time"
-
-	"github.com/rclark/logs"
+logs.Add(ctx,
+	"count", 42,
 )
 
-func main() {
-	ctx := logs.AddEntry(context.Background())
+logs.Adjust(ctx, func(fe *logs.FreeformEntry) {
+	(*fe)["count"] = 43
+})
 
-	logs.Add(ctx,
-		"count", 42,
-	)
-
-	logs.Adjust(ctx, func(fe *logs.FreeformEntry) {
-		(*fe)["count"] = 43
-	})
-
-	logs.Print(ctx, logs.WithCurrentTime(time.Time{}))
-}
+logs.Print(ctx, logs.WithCurrentTime(time.Time{}))
+// Output: {"@level":"INFO","@time":"0001-01-01T00:00:00Z","count":43}
 ```
 
 #### Output
@@ -259,7 +224,7 @@ func main() {
 </details>
 
 <a name="Append"></a>
-## func Append
+## func [Append](<https://github.com/rclark/logs/blob/main/free-form.go#L179>)
 
 ```go
 func Append[T any](ctx context.Context, key string, values ...T) bool
@@ -273,26 +238,16 @@ Append adds values to an existing key of the freeform log entry in the context. 
 
 
 ```go
-package main
+ctx := logs.AddEntry(context.Background())
 
-import (
-	"context"
-	"time"
-
-	"github.com/rclark/logs"
+logs.Add(ctx,
+	"messages", []string{"hello", "world"},
 )
 
-func main() {
-	ctx := logs.AddEntry(context.Background())
+logs.Append(ctx, "messages", "goodbye")
 
-	logs.Add(ctx,
-		"messages", []string{"hello", "world"},
-	)
-
-	logs.Append(ctx, "messages", "goodbye")
-
-	logs.Print(ctx, logs.WithCurrentTime(time.Time{}))
-}
+logs.Print(ctx, logs.WithCurrentTime(time.Time{}))
+// Output: {"@level":"INFO","@time":"0001-01-01T00:00:00Z","messages":["hello","world","goodbye"]}
 ```
 
 #### Output
@@ -305,7 +260,7 @@ func main() {
 </details>
 
 <a name="Debug"></a>
-## func Debug
+## func [Debug](<https://github.com/rclark/logs/blob/main/free-form.go#L64>)
 
 ```go
 func Debug(ctx context.Context) bool
@@ -314,7 +269,7 @@ func Debug(ctx context.Context) bool
 Debug sets the log entry's level to DEBUG. The function will return false if no log entry is found in the context.
 
 <a name="Error"></a>
-## func Error
+## func [Error](<https://github.com/rclark/logs/blob/main/free-form.go#L82>)
 
 ```go
 func Error(ctx context.Context) bool
@@ -323,7 +278,7 @@ func Error(ctx context.Context) bool
 Error sets the log entry's level to ERROR. The function will return false if no log entry is found in the context.
 
 <a name="Fatal"></a>
-## func Fatal
+## func [Fatal](<https://github.com/rclark/logs/blob/main/free-form.go#L88>)
 
 ```go
 func Fatal(ctx context.Context) bool
@@ -332,7 +287,7 @@ func Fatal(ctx context.Context) bool
 Fatal sets the log entry's level to FATAL. The function will return false if no log entry is found in the context.
 
 <a name="Info"></a>
-## func Info
+## func [Info](<https://github.com/rclark/logs/blob/main/free-form.go#L70>)
 
 ```go
 func Info(ctx context.Context) bool
@@ -341,7 +296,7 @@ func Info(ctx context.Context) bool
 Info sets the log entry's level to INFO. The function will return false if no log entry is found in the context.
 
 <a name="Middleware"></a>
-## func Middleware
+## func [Middleware](<https://github.com/rclark/logs/blob/main/free-form.go#L270>)
 
 ```go
 func Middleware(opts ...MiddlewareOption) func(http.Handler) http.Handler
@@ -355,49 +310,22 @@ Middleware adds structured, context\-based logging to an HTTP handler.
 
 
 ```go
-package main
+middleware := logs.Middleware(logs.WithTiming(time.Time{}, time.Duration(1234)))
 
-import (
-	"io"
-	"log"
-	"net/http"
-	"net/http/httptest"
-	"strings"
-	"time"
+w := httptest.NewRecorder()
+r := httptest.NewRequest(http.MethodPost, "/path", strings.NewReader("bar"))
 
-	"github.com/rclark/logs"
-)
-
-var freeformHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, "failed to read body", http.StatusInternalServerError)
-	}
-
-	logs.Add(r.Context(),
-		"messages", []string{"hello", "world"},
-		"foo", string(body),
-	)
-})
-
-func main() {
-	middleware := logs.Middleware(logs.WithTiming(time.Time{}, time.Duration(1234)))
-
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/path", strings.NewReader("bar"))
-
-	middleware(freeformHandler).ServeHTTP(w, r)
-	if w.Code != http.StatusOK {
-		log.Fatal("unexpected status code")
-	}
+middleware(freeformHandler).ServeHTTP(w, r)
+if w.Code != http.StatusOK {
+	log.Fatal("unexpected status code")
 }
+// Output: {"@level":"INFO","@time":"0001-01-01T00:00:00Z","@http":{"method":"POST","path":"/path","status":200,"duration":1234},"foo":"bar","messages":["hello","world"]}
 ```
 
 #### Output
 
 ```
-{"@level":"INFO","@time":"0001-01-01T00:00:00Z","@http":{"method":"POST","path":"/path","duration":1234},"foo":"bar","messages":["hello","world"]}
+{"@level":"INFO","@time":"0001-01-01T00:00:00Z","@http":{"method":"POST","path":"/path","status":200,"duration":1234},"foo":"bar","messages":["hello","world"]}
 ```
 
 </p>
@@ -409,51 +337,24 @@ func main() {
 
 
 ```go
-package main
+middleware := logs.Middleware(logs.WithTiming(time.Time{}, time.Duration(1234)), logs.WithAllHeaders())
 
-import (
-	"io"
-	"log"
-	"net/http"
-	"net/http/httptest"
-	"strings"
-	"time"
+w := httptest.NewRecorder()
+r := httptest.NewRequest(http.MethodPost, "/path", strings.NewReader("bar"))
+r.Header.Set("X-Header", "x")
+r.Header.Set("Y-Header", "y")
 
-	"github.com/rclark/logs"
-)
-
-var freeformHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, "failed to read body", http.StatusInternalServerError)
-	}
-
-	logs.Add(r.Context(),
-		"messages", []string{"hello", "world"},
-		"foo", string(body),
-	)
-})
-
-func main() {
-	middleware := logs.Middleware(logs.WithTiming(time.Time{}, time.Duration(1234)), logs.WithAllHeaders())
-
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/path", strings.NewReader("bar"))
-	r.Header.Set("X-Header", "x")
-	r.Header.Set("Y-Header", "y")
-
-	middleware(freeformHandler).ServeHTTP(w, r)
-	if w.Code != http.StatusOK {
-		log.Fatal("unexpected status code")
-	}
+middleware(freeformHandler).ServeHTTP(w, r)
+if w.Code != http.StatusOK {
+	log.Fatal("unexpected status code")
 }
+// Output: {"@level":"INFO","@time":"0001-01-01T00:00:00Z","@http":{"method":"POST","path":"/path","status":200,"request_headers":{"X-Header":"x","Y-Header":"y"},"duration":1234},"foo":"bar","messages":["hello","world"]}
 ```
 
 #### Output
 
 ```
-{"@level":"INFO","@time":"0001-01-01T00:00:00Z","@http":{"method":"POST","path":"/path","headers":{"X-Header":"x","Y-Header":"y"},"duration":1234},"foo":"bar","messages":["hello","world"]}
+{"@level":"INFO","@time":"0001-01-01T00:00:00Z","@http":{"method":"POST","path":"/path","status":200,"request_headers":{"X-Header":"x","Y-Header":"y"},"duration":1234},"foo":"bar","messages":["hello","world"]}
 ```
 
 </p>
@@ -465,51 +366,24 @@ func main() {
 
 
 ```go
-package main
+middleware := logs.Middleware(logs.WithTiming(time.Time{}, time.Duration(1234)), logs.WithHeaders("X-Header"))
 
-import (
-	"io"
-	"log"
-	"net/http"
-	"net/http/httptest"
-	"strings"
-	"time"
+w := httptest.NewRecorder()
+r := httptest.NewRequest(http.MethodPost, "/path", strings.NewReader("bar"))
+r.Header.Set("X-Header", "x")
+r.Header.Set("Y-Header", "y")
 
-	"github.com/rclark/logs"
-)
-
-var freeformHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, "failed to read body", http.StatusInternalServerError)
-	}
-
-	logs.Add(r.Context(),
-		"messages", []string{"hello", "world"},
-		"foo", string(body),
-	)
-})
-
-func main() {
-	middleware := logs.Middleware(logs.WithTiming(time.Time{}, time.Duration(1234)), logs.WithHeaders("X-Header"))
-
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/path", strings.NewReader("bar"))
-	r.Header.Set("X-Header", "x")
-	r.Header.Set("Y-Header", "y")
-
-	middleware(freeformHandler).ServeHTTP(w, r)
-	if w.Code != http.StatusOK {
-		log.Fatal("unexpected status code")
-	}
+middleware(freeformHandler).ServeHTTP(w, r)
+if w.Code != http.StatusOK {
+	log.Fatal("unexpected status code")
 }
+// Output: {"@level":"INFO","@time":"0001-01-01T00:00:00Z","@http":{"method":"POST","path":"/path","status":200,"request_headers":{"X-Header":"x"},"duration":1234},"foo":"bar","messages":["hello","world"]}
 ```
 
 #### Output
 
 ```
-{"@level":"INFO","@time":"0001-01-01T00:00:00Z","@http":{"method":"POST","path":"/path","headers":{"X-Header":"x"},"duration":1234},"foo":"bar","messages":["hello","world"]}
+{"@level":"INFO","@time":"0001-01-01T00:00:00Z","@http":{"method":"POST","path":"/path","status":200,"request_headers":{"X-Header":"x"},"duration":1234},"foo":"bar","messages":["hello","world"]}
 ```
 
 </p>
@@ -521,56 +395,29 @@ func main() {
 
 
 ```go
-package main
+middleware := logs.Middleware(logs.WithTiming(time.Time{}, time.Duration(1234)), logs.WithBody())
 
-import (
-	"io"
-	"log"
-	"net/http"
-	"net/http/httptest"
-	"strings"
-	"time"
+w := httptest.NewRecorder()
+r := httptest.NewRequest(http.MethodPost, "/path", strings.NewReader("bar"))
 
-	"github.com/rclark/logs"
-)
-
-var freeformHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		http.Error(w, "failed to read body", http.StatusInternalServerError)
-	}
-
-	logs.Add(r.Context(),
-		"messages", []string{"hello", "world"},
-		"foo", string(body),
-	)
-})
-
-func main() {
-	middleware := logs.Middleware(logs.WithTiming(time.Time{}, time.Duration(1234)), logs.WithBody())
-
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/path", strings.NewReader("bar"))
-
-	middleware(freeformHandler).ServeHTTP(w, r)
-	if w.Code != http.StatusOK {
-		log.Fatal("unexpected status code")
-	}
+middleware(freeformHandler).ServeHTTP(w, r)
+if w.Code != http.StatusOK {
+	log.Fatal("unexpected status code")
 }
+// Output: {"@level":"INFO","@time":"0001-01-01T00:00:00Z","@http":{"method":"POST","path":"/path","status":200,"body":"bar","duration":1234},"foo":"bar","messages":["hello","world"]}
 ```
 
 #### Output
 
 ```
-{"@level":"INFO","@time":"0001-01-01T00:00:00Z","@http":{"method":"POST","path":"/path","body":"bar","duration":1234},"foo":"bar","messages":["hello","world"]}
+{"@level":"INFO","@time":"0001-01-01T00:00:00Z","@http":{"method":"POST","path":"/path","status":200,"body":"bar","duration":1234},"foo":"bar","messages":["hello","world"]}
 ```
 
 </p>
 </details>
 
 <a name="Print"></a>
-## func Print
+## func [Print](<https://github.com/rclark/logs/blob/main/free-form.go#L58>)
 
 ```go
 func Print(ctx context.Context, opts ...PrintOption) bool
@@ -587,7 +434,7 @@ The default timer is the system clock. You can change this by providing a custom
 If the you've provided a custom struct for your log entries and it fails to marshal to JSON using the standard json.Marshal\(\), the function will write an error message to os.Stderr and return false.
 
 <a name="Warn"></a>
-## func Warn
+## func [Warn](<https://github.com/rclark/logs/blob/main/free-form.go#L76>)
 
 ```go
 func Warn(ctx context.Context) bool
@@ -596,7 +443,7 @@ func Warn(ctx context.Context) bool
 Warn sets the log entry's level to WARN. The function will return false if no log entry is found in the context.
 
 <a name="EntryMaker"></a>
-## type EntryMaker
+## type [EntryMaker](<https://github.com/rclark/logs/blob/main/logging.go#L14>)
 
 EntryMaker is any function that creates a new, mutable log entry.
 
@@ -605,7 +452,7 @@ type EntryMaker[T any] func() *T
 ```
 
 <a name="ExampleLog"></a>
-## type ExampleLog
+## type [ExampleLog](<https://github.com/rclark/logs/blob/main/logger.go#L123-L128>)
 
 ExampleLog is an example of a struct designed to be used as a log entry.
 
@@ -619,7 +466,7 @@ type ExampleLog struct {
 ```
 
 <a name="NewExampleLog"></a>
-### func NewExampleLog
+### func [NewExampleLog](<https://github.com/rclark/logs/blob/main/logger.go#L132>)
 
 ```go
 func NewExampleLog() *ExampleLog
@@ -628,7 +475,7 @@ func NewExampleLog() *ExampleLog
 NewExampleLog defines how to create an empty, mutable version of an [ExampleLog](<#ExampleLog>).
 
 <a name="FreeformEntry"></a>
-## type FreeformEntry
+## type [FreeformEntry](<https://github.com/rclark/logs/blob/main/free-form.go#L32>)
 
 FreeformEntry is a freeform log entry.
 
@@ -637,7 +484,7 @@ type FreeformEntry map[string]any
 ```
 
 <a name="GetEntry"></a>
-### func GetEntry
+### func [GetEntry](<https://github.com/rclark/logs/blob/main/free-form.go#L143>)
 
 ```go
 func GetEntry(ctx context.Context) *FreeformEntry
@@ -651,32 +498,21 @@ GetFreeformEntry retrieves the freeform log entry from the context. The function
 
 
 ```go
-package main
+ctx := logs.AddEntry(context.Background())
 
-import (
-	"context"
-	"log"
-	"time"
-
-	"github.com/rclark/logs"
+logs.Add(ctx,
+	"count", 42,
 )
 
-func main() {
-	ctx := logs.AddEntry(context.Background())
-
-	logs.Add(ctx,
-		"count", 42,
-	)
-
-	entry := logs.GetEntry(ctx)
-	if entry == nil {
-		log.Fatal("entry not found")
-	}
-
-	(*entry)["count"] = 43
-
-	logs.Print(ctx, logs.WithCurrentTime(time.Time{}))
+entry := logs.GetEntry(ctx)
+if entry == nil {
+	log.Fatal("entry not found")
 }
+
+(*entry)["count"] = 43
+
+logs.Print(ctx, logs.WithCurrentTime(time.Time{}))
+// Output: {"@level":"INFO","@time":"0001-01-01T00:00:00Z","count":43}
 ```
 
 #### Output
@@ -689,22 +525,24 @@ func main() {
 </details>
 
 <a name="HttpData"></a>
-## type HttpData
+## type [HttpData](<https://github.com/rclark/logs/blob/main/free-form.go#L246-L254>)
 
 HttpData is the data structure for HTTP data that the middleware will apply to log entries under the \`@http\` key of a [FreeformEntry](<#FreeformEntry>).
 
 ```go
 type HttpData struct {
-    Method   string            `json:"method"`
-    Path     string            `json:"path"`
-    Headers  map[string]string `json:"headers,omitempty"`
-    Body     string            `json:"body,omitempty"`
-    Duration time.Duration     `json:"duration"`
+    Method          string            `json:"method"`
+    Path            string            `json:"path"`
+    Status          int               `json:"status"`
+    RequestHeaders  map[string]string `json:"request_headers,omitempty"`
+    ResponseHeaders map[string]string `json:"response_headers,omitempty"`
+    Body            string            `json:"body,omitempty"`
+    Duration        time.Duration     `json:"duration"`
 }
 ```
 
 <a name="Level"></a>
-## type Level
+## type [Level](<https://github.com/rclark/logs/blob/main/logging.go#L17>)
 
 Level represents the level of logging.
 
@@ -730,7 +568,7 @@ const (
 ```
 
 <a name="Level.String"></a>
-### func \(Level\) String
+### func \(Level\) [String](<https://github.com/rclark/logs/blob/main/logging.go#L32>)
 
 ```go
 func (l Level) String() string
@@ -739,7 +577,7 @@ func (l Level) String() string
 
 
 <a name="Logger"></a>
-## type Logger
+## type [Logger](<https://github.com/rclark/logs/blob/main/logger.go#L9-L11>)
 
 Logger is a logger that logs structured data.
 
@@ -755,29 +593,19 @@ type Logger[T any] struct {
 
 
 ```go
-package main
+logger := logs.NewLogger(logs.NewExampleLog)
 
-import (
-	"context"
-	"time"
+ctx := logger.AddEntry(context.Background())
 
-	"github.com/rclark/logs"
-)
+logger.Adjust(ctx, func(e *logs.ExampleLog) {
+	e.Name = "test"
+	e.Count = 42
+	e.Flag = true
+	e.Messages = []string{"hello", "world"}
+})
 
-func main() {
-	logger := logs.NewLogger(logs.NewExampleLog)
-
-	ctx := logger.AddEntry(context.Background())
-
-	logger.Adjust(ctx, func(e *logs.ExampleLog) {
-		e.Name = "test"
-		e.Count = 42
-		e.Flag = true
-		e.Messages = []string{"hello", "world"}
-	})
-
-	logger.Print(ctx, logs.WithCurrentTime(time.Time{}))
-}
+logger.Print(ctx, logs.WithCurrentTime(time.Time{}))
+// Output: {"@level":"INFO","@time":"0001-01-01T00:00:00Z","name":"test","count":42,"flag":true,"messages":["hello","world"]}
 ```
 
 #### Output
@@ -795,41 +623,33 @@ func main() {
 
 
 ```go
-package main
-
-import (
-	"context"
-	"time"
-
-	"github.com/rclark/logs"
-)
-
-func main() {
-	// Will only print logs at or above INFO level.
-	printOptions := []logs.PrintOption{
-		logs.WithCurrentTime(time.Time{}),
-		logs.WithLevel(logs.INFO),
-	}
-
-	logger := logs.NewLogger(logs.NewExampleLog)
-
-	ctx := logger.AddEntry(context.Background())
-	logger.Adjust(ctx, func(e *logs.ExampleLog) {
-		e.Messages = []string{"info"}
-	})
-	logger.Print(ctx, printOptions...)
-
-	ctx = logger.AddEntry(context.Background())
-	logger.Debug(ctx)
-	logger.Adjust(ctx, func(e *logs.ExampleLog) {
-		e.Messages = []string{"debug"}
-	})
-	logger.Print(ctx, printOptions...)
-
-	ctx = logger.AddEntry(context.Background())
-	logger.Fatal(ctx)
-	logger.Print(ctx, printOptions...)
+// Will only print logs at or above INFO level.
+printOptions := []logs.PrintOption{
+	logs.WithCurrentTime(time.Time{}),
+	logs.WithLevel(logs.INFO),
 }
+
+logger := logs.NewLogger(logs.NewExampleLog)
+
+ctx := logger.AddEntry(context.Background())
+logger.Adjust(ctx, func(e *logs.ExampleLog) {
+	e.Messages = []string{"info"}
+})
+logger.Print(ctx, printOptions...)
+
+ctx = logger.AddEntry(context.Background())
+logger.Debug(ctx)
+logger.Adjust(ctx, func(e *logs.ExampleLog) {
+	e.Messages = []string{"debug"}
+})
+logger.Print(ctx, printOptions...)
+
+ctx = logger.AddEntry(context.Background())
+logger.Fatal(ctx)
+logger.Print(ctx, printOptions...)
+// Output:
+// {"@level":"INFO","@time":"0001-01-01T00:00:00Z","name":"","count":0,"flag":false,"messages":["info"]}
+// {"@level":"FATAL","@time":"0001-01-01T00:00:00Z","name":"","count":0,"flag":false}
 ```
 
 #### Output
@@ -843,7 +663,7 @@ func main() {
 </details>
 
 <a name="Get"></a>
-### func Get
+### func [Get](<https://github.com/rclark/logs/blob/main/logger.go#L112>)
 
 ```go
 func Get[T any](ctx context.Context) *Logger[T]
@@ -852,7 +672,7 @@ func Get[T any](ctx context.Context) *Logger[T]
 Get retrieves the logger from the context. The function will return nil if no logger of the requested type is found.
 
 <a name="NewLogger"></a>
-### func NewLogger
+### func [NewLogger](<https://github.com/rclark/logs/blob/main/logger.go#L15>)
 
 ```go
 func NewLogger[T any](create EntryMaker[T]) Logger[T]
@@ -861,7 +681,7 @@ func NewLogger[T any](create EntryMaker[T]) Logger[T]
 NewLogger creates a new structured logger for the logs of the specified type.
 
 <a name="Logger[T].AddEntry"></a>
-### func \(Logger\[T\]\) AddEntry
+### func \(Logger\[T\]\) [AddEntry](<https://github.com/rclark/logs/blob/main/logger.go#L20>)
 
 ```go
 func (logger Logger[T]) AddEntry(ctx context.Context, opts ...Option) context.Context
@@ -870,7 +690,7 @@ func (logger Logger[T]) AddEntry(ctx context.Context, opts ...Option) context.Co
 AddEntry adds a log entry to the context.
 
 <a name="Logger[T].Adjust"></a>
-### func \(Logger\[T\]\) Adjust
+### func \(Logger\[T\]\) [Adjust](<https://github.com/rclark/logs/blob/main/logger.go#L26>)
 
 ```go
 func (Logger[T]) Adjust(ctx context.Context, fns ...adjuster[T]) bool
@@ -879,7 +699,7 @@ func (Logger[T]) Adjust(ctx context.Context, fns ...adjuster[T]) bool
 Adjust mutates the log entry in the context as JSON. The function will return false if no log entry of the correct type is found in the context.
 
 <a name="Logger[T].Debug"></a>
-### func \(Logger\[T\]\) Debug
+### func \(Logger\[T\]\) [Debug](<https://github.com/rclark/logs/blob/main/logger.go#L50>)
 
 ```go
 func (Logger[T]) Debug(ctx context.Context) bool
@@ -888,7 +708,7 @@ func (Logger[T]) Debug(ctx context.Context) bool
 Debug sets the log entry's level to DEBUG and adds data to it. The function will return false if no log entry of the correct type is found in the context.
 
 <a name="Logger[T].Error"></a>
-### func \(Logger\[T\]\) Error
+### func \(Logger\[T\]\) [Error](<https://github.com/rclark/logs/blob/main/logger.go#L71>)
 
 ```go
 func (Logger[T]) Error(ctx context.Context) bool
@@ -897,7 +717,7 @@ func (Logger[T]) Error(ctx context.Context) bool
 Error sets the log entry's level to ERROR and adds data to it. The function will return false if no log entry of the correct type is found in the context.
 
 <a name="Logger[T].Fatal"></a>
-### func \(Logger\[T\]\) Fatal
+### func \(Logger\[T\]\) [Fatal](<https://github.com/rclark/logs/blob/main/logger.go#L78>)
 
 ```go
 func (Logger[T]) Fatal(ctx context.Context) bool
@@ -906,7 +726,7 @@ func (Logger[T]) Fatal(ctx context.Context) bool
 Fatal sets the log entry's level to FATAL and adds data to it. The function will return false if no log entry of the correct type is found in the context.
 
 <a name="Logger[T].GetEntry"></a>
-### func \(Logger\[T\]\) GetEntry
+### func \(Logger\[T\]\) [GetEntry](<https://github.com/rclark/logs/blob/main/logger.go#L39>)
 
 ```go
 func (Logger[T]) GetEntry(ctx context.Context) *T
@@ -920,34 +740,24 @@ GetEntry gets the log entry from the context for direct manipulation. The functi
 
 
 ```go
-package main
+logger := logs.NewLogger(logs.NewExampleLog)
 
-import (
-	"context"
-	"time"
+ctx := logger.AddEntry(context.Background())
 
-	"github.com/rclark/logs"
-)
+logger.Adjust(ctx, func(e *logs.ExampleLog) {
+	e.Name = "test"
+	e.Count = 42
+	e.Flag = true
+	e.Messages = []string{"hello", "world"}
+})
 
-func main() {
-	logger := logs.NewLogger(logs.NewExampleLog)
-
-	ctx := logger.AddEntry(context.Background())
-
-	logger.Adjust(ctx, func(e *logs.ExampleLog) {
-		e.Name = "test"
-		e.Count = 42
-		e.Flag = true
-		e.Messages = []string{"hello", "world"}
-	})
-
-	e := logger.GetEntry(ctx)
-	if e != nil {
-		e.Flag = false
-	}
-
-	logger.Print(ctx, logs.WithCurrentTime(time.Time{}))
+e := logger.GetEntry(ctx)
+if e != nil {
+	e.Flag = false
 }
+
+logger.Print(ctx, logs.WithCurrentTime(time.Time{}))
+// Output: {"@level":"INFO","@time":"0001-01-01T00:00:00Z","name":"test","count":42,"flag":false,"messages":["hello","world"]}
 ```
 
 #### Output
@@ -960,7 +770,7 @@ func main() {
 </details>
 
 <a name="Logger[T].Info"></a>
-### func \(Logger\[T\]\) Info
+### func \(Logger\[T\]\) [Info](<https://github.com/rclark/logs/blob/main/logger.go#L57>)
 
 ```go
 func (Logger[T]) Info(ctx context.Context) bool
@@ -969,7 +779,7 @@ func (Logger[T]) Info(ctx context.Context) bool
 Info sets the log entry's level to INFO and adds data to it. The function will return false if no log entry of the correct type is found in the context.
 
 <a name="Logger[T].Middleware"></a>
-### func \(Logger\[T\]\) Middleware
+### func \(Logger\[T\]\) [Middleware](<https://github.com/rclark/logs/blob/main/logger.go#L84>)
 
 ```go
 func (logger Logger[T]) Middleware(opts ...MiddlewareOption) func(http.Handler) http.Handler
@@ -983,41 +793,15 @@ Middleware adds structured, context\-based logging to an HTTP handler. All reque
 
 
 ```go
-package main
+logger := logs.NewLogger(logs.NewExampleLog)
 
-import (
-	"log"
-	"net/http"
-	"net/http/httptest"
-	"time"
+middleware := logger.Middleware(logs.WithTiming(time.Time{}, time.Duration(1234)))
 
-	"github.com/rclark/logs"
-)
+w := httptest.NewRecorder()
+r := httptest.NewRequest("GET", "/path", nil)
 
-var handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	logger := logs.Get[logs.ExampleLog](r.Context())
-	if logger == nil {
-		log.Fatal("logger not found")
-	}
-
-	logger.Adjust(r.Context(), func(e *logs.ExampleLog) {
-		e.Name = "test"
-		e.Count = 42
-		e.Flag = true
-		e.Messages = []string{"hello", "world"}
-	})
-})
-
-func main() {
-	logger := logs.NewLogger(logs.NewExampleLog)
-
-	middleware := logger.Middleware(logs.WithTiming(time.Time{}, time.Duration(1234)))
-
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/path", nil)
-
-	middleware(handler).ServeHTTP(w, r)
-}
+middleware(handler).ServeHTTP(w, r)
+// Output: {"@level":"INFO","@time":"0001-01-01T00:00:00Z","name":"test","count":42,"flag":true,"messages":["hello","world"]}
 ```
 
 #### Output
@@ -1030,7 +814,7 @@ func main() {
 </details>
 
 <a name="Logger[T].Print"></a>
-### func \(Logger\[T\]\) Print
+### func \(Logger\[T\]\) [Print](<https://github.com/rclark/logs/blob/main/logger.go#L32>)
 
 ```go
 func (Logger[T]) Print(ctx context.Context, opts ...PrintOption) bool
@@ -1039,7 +823,7 @@ func (Logger[T]) Print(ctx context.Context, opts ...PrintOption) bool
 Print prints the log entry in the context as JSON. The function will return false if no log entry of the correct type is found in the context.
 
 <a name="Logger[T].Set"></a>
-### func \(Logger\[T\]\) Set
+### func \(Logger\[T\]\) [Set](<https://github.com/rclark/logs/blob/main/logger.go#L106>)
 
 ```go
 func (logger Logger[T]) Set(ctx context.Context) context.Context
@@ -1048,7 +832,7 @@ func (logger Logger[T]) Set(ctx context.Context) context.Context
 Set places the logger in the context.
 
 <a name="Logger[T].Warn"></a>
-### func \(Logger\[T\]\) Warn
+### func \(Logger\[T\]\) [Warn](<https://github.com/rclark/logs/blob/main/logger.go#L64>)
 
 ```go
 func (s Logger[T]) Warn(ctx context.Context) bool
@@ -1057,7 +841,7 @@ func (s Logger[T]) Warn(ctx context.Context) bool
 Warn sets the log entry's level to WARN and adds data to it. The function will return false if no log entry of the correct type is found in the context.
 
 <a name="MiddlewareOption"></a>
-## type MiddlewareOption
+## type [MiddlewareOption](<https://github.com/rclark/logs/blob/main/logging.go#L279>)
 
 MiddlewareOption is used to configure logs generated by the [Middleware](<#Middleware>).
 
@@ -1066,7 +850,7 @@ type MiddlewareOption func(*option)
 ```
 
 <a name="DefaultLevel"></a>
-### func DefaultLevel
+### func [DefaultLevel](<https://github.com/rclark/logs/blob/main/logging.go#L283>)
 
 ```go
 func DefaultLevel(level Level) MiddlewareOption
@@ -1075,7 +859,7 @@ func DefaultLevel(level Level) MiddlewareOption
 DefaultLevel sets the default log level for the log entries produced by the [Middleware](<#Middleware>).
 
 <a name="Output"></a>
-### func Output
+### func [Output](<https://github.com/rclark/logs/blob/main/logging.go#L294>)
 
 ```go
 func Output(out io.Writer) MiddlewareOption
@@ -1084,7 +868,7 @@ func Output(out io.Writer) MiddlewareOption
 WithOutput sets the output for the log entries produced by the [Middleware](<#Middleware>).
 
 <a name="PrintLevel"></a>
-### func PrintLevel
+### func [PrintLevel](<https://github.com/rclark/logs/blob/main/logging.go#L289>)
 
 ```go
 func PrintLevel(level Level) MiddlewareOption
@@ -1093,7 +877,7 @@ func PrintLevel(level Level) MiddlewareOption
 PrintLevel sets the minimum log level for printing log entries produced by the [Middleware](<#Middleware>).
 
 <a name="WithAllHeaders"></a>
-### func WithAllHeaders
+### func [WithAllHeaders](<https://github.com/rclark/logs/blob/main/free-form.go#L211>)
 
 ```go
 func WithAllHeaders() MiddlewareOption
@@ -1101,8 +885,17 @@ func WithAllHeaders() MiddlewareOption
 
 WithAllHeaders configures the middleware to write all request headers into each log entry. This option will have no effect unless [Middleware](<#Middleware>) is operating on a [FreeformEntry](<#FreeformEntry>).
 
+<a name="WithAllResponseHeaders"></a>
+### func [WithAllResponseHeaders](<https://github.com/rclark/logs/blob/main/free-form.go#L229>)
+
+```go
+func WithAllResponseHeaders() MiddlewareOption
+```
+
+WithAllResponseHeaders configures the middleware to write all response headers into each log entry. This option will have no effect unless [Middleware](<#Middleware>) is operating on a [FreeformEntry](<#FreeformEntry>).
+
 <a name="WithBody"></a>
-### func WithBody
+### func [WithBody](<https://github.com/rclark/logs/blob/main/free-form.go#L202>)
 
 ```go
 func WithBody() MiddlewareOption
@@ -1111,7 +904,7 @@ func WithBody() MiddlewareOption
 WithBody configures the middleware to write request bodies into each log entry. This option will have no effect unless [Middleware](<#Middleware>) is operating on a [FreeformEntry](<#FreeformEntry>).
 
 <a name="WithHeaders"></a>
-### func WithHeaders
+### func [WithHeaders](<https://github.com/rclark/logs/blob/main/free-form.go#L220>)
 
 ```go
 func WithHeaders(headers ...string) MiddlewareOption
@@ -1119,8 +912,17 @@ func WithHeaders(headers ...string) MiddlewareOption
 
 WithHeaders configures the middleware to write specific request headers into each log entry. This option will have no effect unless [Middleware](<#Middleware>) is operating on a [FreeformEntry](<#FreeformEntry>).
 
+<a name="WithResponseHeaders"></a>
+### func [WithResponseHeaders](<https://github.com/rclark/logs/blob/main/free-form.go#L238>)
+
+```go
+func WithResponseHeaders(headers ...string) MiddlewareOption
+```
+
+WithResponseHeaders configures the middleware to write specific response headers into each log entry. This option will have no effect unless [Middleware](<#Middleware>) is operating on a [FreeformEntry](<#FreeformEntry>).
+
 <a name="WithTiming"></a>
-### func WithTiming
+### func [WithTiming](<https://github.com/rclark/logs/blob/main/logging.go#L300>)
 
 ```go
 func WithTiming(now time.Time, since time.Duration) MiddlewareOption
@@ -1129,7 +931,7 @@ func WithTiming(now time.Time, since time.Duration) MiddlewareOption
 WithTiming configures the middleware to always print logs with the given timestamp and the given duration.
 
 <a name="Option"></a>
-## type Option
+## type [Option](<https://github.com/rclark/logs/blob/main/logging.go#L123>)
 
 Option is configuration for a log entry.
 
@@ -1138,7 +940,7 @@ type Option func(*option)
 ```
 
 <a name="WithDefaultLevel"></a>
-### func WithDefaultLevel
+### func [WithDefaultLevel](<https://github.com/rclark/logs/blob/main/logging.go#L129>)
 
 ```go
 func WithDefaultLevel(level Level) Option
@@ -1147,7 +949,7 @@ func WithDefaultLevel(level Level) Option
 WithDefaultLevel sets the log level for the log entry. This can be overridden while collecting log data using functions like [Debug](<#Debug>) and [Error](<#Error>). The default level for an entry if this configuration option is not applied is INFO.
 
 <a name="PrintOption"></a>
-## type PrintOption
+## type [PrintOption](<https://github.com/rclark/logs/blob/main/logging.go#L65>)
 
 PrintOption is a configuration option for printing logs.
 
@@ -1156,7 +958,7 @@ type PrintOption func(*option)
 ```
 
 <a name="WithCurrentTime"></a>
-### func WithCurrentTime
+### func [WithCurrentTime](<https://github.com/rclark/logs/blob/main/logging.go#L115>)
 
 ```go
 func WithCurrentTime(now time.Time) PrintOption
@@ -1165,7 +967,7 @@ func WithCurrentTime(now time.Time) PrintOption
 WithCurrentTime configures logs to always print with the same timestamp.
 
 <a name="WithLevel"></a>
-### func WithLevel
+### func [WithLevel](<https://github.com/rclark/logs/blob/main/logging.go#L77>)
 
 ```go
 func WithLevel(level Level) PrintOption
@@ -1174,7 +976,7 @@ func WithLevel(level Level) PrintOption
 WithLevel sets the log level for printing the log entry. The default is INFO. If the log entry's level is less than the level set here, it will not be printed.
 
 <a name="WithOutput"></a>
-### func WithOutput
+### func [WithOutput](<https://github.com/rclark/logs/blob/main/logging.go#L68>)
 
 ```go
 func WithOutput(out io.Writer) PrintOption
@@ -1183,7 +985,7 @@ func WithOutput(out io.Writer) PrintOption
 WithOutput sets the output for the log entry. The default is os.Stdout.
 
 <a name="Timer"></a>
-## type Timer
+## type [Timer](<https://github.com/rclark/logs/blob/main/logging.go#L86-L89>)
 
 Timer is an interface for measuring HTTP request duration. Provide your own implementation to use as a custom timer if you want to test your logging system.
 
