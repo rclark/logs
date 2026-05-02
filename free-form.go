@@ -210,7 +210,7 @@ func WithBody() MiddlewareOption {
 // operating on a [FreeformEntry].
 func WithAllHeaders() MiddlewareOption {
 	return func(o *option) {
-		o.allHeaders = true
+		o.allRequestHeaders = true
 	}
 }
 
@@ -219,18 +219,38 @@ func WithAllHeaders() MiddlewareOption {
 // operating on a [FreeformEntry].
 func WithHeaders(headers ...string) MiddlewareOption {
 	return func(o *option) {
-		o.someHeaders = headers
+		o.someRequestHeaders = headers
+	}
+}
+
+// WithAllResponseHeaders configures the middleware to write all response
+// headers into each log entry. This option will have no effect unless
+// [Middleware] is operating on a [FreeformEntry].
+func WithAllResponseHeaders() MiddlewareOption {
+	return func(o *option) {
+		o.allResponseHeaders = true
+	}
+}
+
+// WithResponseHeaders configures the middleware to write specific response
+// headers into each log entry. This option will have no effect unless
+// [Middleware] is operating on a [FreeformEntry].
+func WithResponseHeaders(headers ...string) MiddlewareOption {
+	return func(o *option) {
+		o.someResponseHeaders = headers
 	}
 }
 
 // HttpData is the data structure for HTTP data that the middleware will apply
 // to log entries under the `@http` key of a [FreeformEntry].
 type HttpData struct {
-	Method   string            `json:"method"`
-	Path     string            `json:"path"`
-	Headers  map[string]string `json:"headers,omitempty"`
-	Body     string            `json:"body,omitempty"`
-	Duration time.Duration     `json:"duration"`
+	Method          string            `json:"method"`
+	Path            string            `json:"path"`
+	Status          int               `json:"status"`
+	RequestHeaders  map[string]string `json:"request_headers,omitempty"`
+	ResponseHeaders map[string]string `json:"response_headers,omitempty"`
+	Body            string            `json:"body,omitempty"`
+	Duration        time.Duration     `json:"duration"`
 }
 
 type bodyWatcher struct {
@@ -267,22 +287,41 @@ func Middleware(opts ...MiddlewareOption) func(http.Handler) http.Handler {
 				r.Body = &bodyWatcher{r.Body, buf}
 			}
 
-			next.ServeHTTP(w, r.WithContext(ctx))
+			ww, wrapped := wrapResponseWriter(w)
+			next.ServeHTTP(wrapped, r.WithContext(ctx))
 
 			data.Duration = opt.timer.Since(start)
+			data.Status = ww.Status()
+			if data.Status == 0 {
+				data.Status = http.StatusOK
+			}
+
 			if opt.body {
 				data.Body = buf.String()
 			}
 
-			if len(opt.someHeaders) > 0 {
-				data.Headers = make(map[string]string)
-				for _, h := range opt.someHeaders {
-					data.Headers[h] = r.Header.Get(h)
+			if len(opt.someRequestHeaders) > 0 {
+				data.RequestHeaders = make(map[string]string)
+				for _, h := range opt.someRequestHeaders {
+					data.RequestHeaders[h] = r.Header.Get(h)
 				}
-			} else if opt.allHeaders {
-				data.Headers = make(map[string]string)
+			} else if opt.allRequestHeaders {
+				data.RequestHeaders = make(map[string]string)
 				for k := range r.Header {
-					data.Headers[k] = r.Header.Get(k)
+					data.RequestHeaders[k] = r.Header.Get(k)
+				}
+			}
+
+			respHeaders := ww.Header()
+			if len(opt.someResponseHeaders) > 0 {
+				data.ResponseHeaders = make(map[string]string)
+				for _, h := range opt.someResponseHeaders {
+					data.ResponseHeaders[h] = respHeaders.Get(h)
+				}
+			} else if opt.allResponseHeaders {
+				data.ResponseHeaders = make(map[string]string)
+				for k := range respHeaders {
+					data.ResponseHeaders[k] = respHeaders.Get(k)
 				}
 			}
 

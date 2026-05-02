@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rclark/logs"
+	"github.com/rclark/logs/v2"
 )
 
 func Example() {
@@ -141,7 +141,7 @@ func ExampleMiddleware() {
 	if w.Code != http.StatusOK {
 		log.Fatal("unexpected status code")
 	}
-	// Output: {"@level":"INFO","@time":"0001-01-01T00:00:00Z","@http":{"method":"POST","path":"/path","duration":1234},"foo":"bar","messages":["hello","world"]}
+	// Output: {"@level":"INFO","@time":"0001-01-01T00:00:00Z","@http":{"method":"POST","path":"/path","status":200,"duration":1234},"foo":"bar","messages":["hello","world"]}
 }
 
 func ExampleMiddleware_withBody() {
@@ -154,7 +154,7 @@ func ExampleMiddleware_withBody() {
 	if w.Code != http.StatusOK {
 		log.Fatal("unexpected status code")
 	}
-	// Output: {"@level":"INFO","@time":"0001-01-01T00:00:00Z","@http":{"method":"POST","path":"/path","body":"bar","duration":1234},"foo":"bar","messages":["hello","world"]}
+	// Output: {"@level":"INFO","@time":"0001-01-01T00:00:00Z","@http":{"method":"POST","path":"/path","status":200,"body":"bar","duration":1234},"foo":"bar","messages":["hello","world"]}
 }
 
 func ExampleMiddleware_someHeaders() {
@@ -169,7 +169,7 @@ func ExampleMiddleware_someHeaders() {
 	if w.Code != http.StatusOK {
 		log.Fatal("unexpected status code")
 	}
-	// Output: {"@level":"INFO","@time":"0001-01-01T00:00:00Z","@http":{"method":"POST","path":"/path","headers":{"X-Header":"x"},"duration":1234},"foo":"bar","messages":["hello","world"]}
+	// Output: {"@level":"INFO","@time":"0001-01-01T00:00:00Z","@http":{"method":"POST","path":"/path","status":200,"request_headers":{"X-Header":"x"},"duration":1234},"foo":"bar","messages":["hello","world"]}
 }
 
 func ExampleMiddleware_allHeaders() {
@@ -184,5 +184,5 @@ func ExampleMiddleware_allHeaders() {
 	if w.Code != http.StatusOK {
 		log.Fatal("unexpected status code")
 	}
-	// Output: {"@level":"INFO","@time":"0001-01-01T00:00:00Z","@http":{"method":"POST","path":"/path","headers":{"X-Header":"x","Y-Header":"y"},"duration":1234},"foo":"bar","messages":["hello","world"]}
+	// Output: {"@level":"INFO","@time":"0001-01-01T00:00:00Z","@http":{"method":"POST","path":"/path","status":200,"request_headers":{"X-Header":"x","Y-Header":"y"},"duration":1234},"foo":"bar","messages":["hello","world"]}
 }

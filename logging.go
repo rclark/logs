@@ -47,16 +47,18 @@ func (l Level) String() string {
 }
 
 type option struct {
-	out         io.Writer
-	entryLevel  Level
-	printLevel  Level
-	timer       Timer
-	body        bool
-	allHeaders  bool
-	someHeaders []string
-	now         time.Time
-	since       time.Duration
-	fakeTime    bool
+	out                 io.Writer
+	entryLevel          Level
+	printLevel          Level
+	timer               Timer
+	body                bool
+	allRequestHeaders   bool
+	someRequestHeaders  []string
+	allResponseHeaders  bool
+	someResponseHeaders []string
+	now                 time.Time
+	since               time.Duration
+	fakeTime            bool
 }
 
 // PrintOption is a configuration option for printing logs.
